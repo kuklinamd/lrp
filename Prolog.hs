@@ -1,4 +1,4 @@
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TupleSections, DeriveFunctor #-}
 
 module Prolog (module Prolog) where
     
@@ -16,7 +16,9 @@ data Name = Name { nmStr :: String, nmIdx :: Int } deriving (Eq, Ord)
 
 var = Var . flip Name 0
 
-data Term = Var Name | Val String | Ctr String [Term] deriving Eq
+data Preterm a = Var a | Val String | Ctr String [Term] deriving (Eq, Functor)
+
+type Term = Preterm Name
 
 data Fun = Fn { fnName :: String, fnArgs :: [Term] }
 
@@ -39,9 +41,7 @@ findDef (Program defs) name
 -- Rename
 --
 renameTerm :: Int -> Term -> Term
-renameTerm _ t@(Val _)  = t
-renameTerm i (Ctr n ts) = Ctr n (renameTerm i <$> ts)
-renameTerm i (Var x)    = Var (Name (nmStr x) i)
+renameTerm i = fmap (\name -> name { nmIdx = i })
 
 renameFun :: Int -> Fun -> Fun
 renameFun i (Fn name args) = Fn name (renameTerm i <$> args)
@@ -220,7 +220,7 @@ instance Show Name where
   show (Name s 0) = s
   show (Name s i) = s ++ "_" ++ show i
 
-instance Show Term where
+instance Show a => Show (Preterm a) where
   show (Var s) = show s
   show (Val s) = "`" ++ s
   show (Ctr name args) = name ++ "(" ++ intercalate ", " (show <$> args) ++ ")"
