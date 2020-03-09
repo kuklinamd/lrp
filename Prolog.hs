@@ -9,6 +9,7 @@ import Data.List (intercalate, find, findIndex, partition)
 import Data.Maybe (fromMaybe, isJust, fromJust, isNothing)
 
 import Control.Arrow (first, second)
+import Control.Monad (foldM)
 
 import Debug.Trace
 
@@ -71,8 +72,8 @@ insert s n t
   | otherwise = Nothing
   where t' = lookup n s
 
-unionSubst :: Subst -> Subst -> Subst
-unionSubst = foldl (uncurry . ((fromJust .) .) . insert)
+unionSubst :: Subst -> Subst -> Maybe Subst
+unionSubst = foldM (uncurry . insert)
 
 occursCheck :: Name -> Term -> Bool
 occursCheck name term = not $ occurs name term
@@ -123,7 +124,7 @@ unifyList s (x:xs) (y:ys) =
     let xs' = applySubst s' xs
     let ys' = applySubst s' ys
     s'' <- unifyList s xs' ys'
-    return (unionSubst s' s'')
+    unionSubst s' s''
 
 applySubst :: Subst -> [Term] -> [Term]
 applySubst s ts = [applyTerm s t | t <- ts]
