@@ -75,11 +75,6 @@ insert s n t
 unionSubst :: Subst -> Subst -> Maybe Subst
 unionSubst = foldM (uncurry . insert)
 
-occursCheck :: Name -> Term -> Bool
-occursCheck name term = not $ occurs name term
-
-occurs name term = name `elem` freeVars term
-
 freeVars :: Term -> Set.Set Name
 freeVars (Val _) = Set.empty
 freeVars (Var x) = Set.singleton x
@@ -103,10 +98,10 @@ unify' s (Var a) (Var b)
   | a == b
   = Just s
 unify' s (Var a) t
-  | occursCheck a t
+  | a `notElem` freeVars t
   = insert s a t
 unify' s t (Var a)
-  | occursCheck a t
+  | a `notElem` freeVars t
   = insert s a t
 unify' s (Ctr n1 a1) (Ctr n2 a2)
   | n1 == n2
