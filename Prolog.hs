@@ -1,6 +1,6 @@
 {-# LANGUAGE TupleSections #-}
 
-module Prolog where
+module Prolog (module Prolog) where
     
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -73,7 +73,7 @@ substCheck s n t
   = True
 
 unionSubst :: Subst -> Subst -> Subst
-unionSubst s ss = foldl (uncurry . ((fromJust .) .) . insert) s ss
+unionSubst = foldl (uncurry . ((fromJust .) .) . insert)
 
 occursCheck :: Name -> Term -> Bool
 occursCheck name term = not $ occurs name term
@@ -191,7 +191,7 @@ resolve' nameSupply prg idx subst q@(g@(Fn name _):gs) =
     children = unifyWithClause subst g <$> def
     -- Left only unificated children
  -- in trace ("\nUnified: " ++ show children) $ let
-    branches = fmap fromJust $ filter isJust children
+    branches = fromJust <$> filter isJust children
 
     ns' = nextName nameSupply
  in branches >>= (\(s, g) -> resolve' ns' prg idx s (g ++ gs))
@@ -206,7 +206,7 @@ unifyWithClause subst g@(Fn name args) (Cls head@(Fn name' args') body)
 isUnifiableArgs :: [Term] -> [Term] -> Bool
 isUnifiableArgs t1 t2
  | length t1 == length t2
- = all id $ uncurry isUnifiable <$> zip t1 t2
+ = and $ uncurry isUnifiable <$> zip t1 t2
  | otherwise
  = False
 
@@ -223,7 +223,7 @@ instance Show Name where
 instance Show Term where
   show (Var s) = show s
   show (Val s) = "`" ++ s
-  show (Ctr name args) = name ++ "(" ++ (intercalate ", " $ show <$> args) ++ ")"
+  show (Ctr name args) = name ++ "(" ++ intercalate ", " (show <$> args) ++ ")"
 
 instance Show Fun where
   show (Fn name args) = name ++ "(" ++ intercalate ", " (show <$> args) ++ ")"
@@ -236,7 +236,7 @@ instance Show Def where
   show (Def cs) = intercalate "\n" (show <$> cs)
 
 instance Show Program where
-  show = intercalate "\n" . fmap show . fmap snd . defs
+  show = intercalate "\n" . fmap (show . snd) . defs
 
 instance Show Goal where
   show (Goal gl) = intercalate "," $ show <$> gl
@@ -284,9 +284,9 @@ query23 = Goal [Fn "append" [cons (var "H") (var "T"), var "Y", var "R"]]
 example3 = Program [("p", p), ("q", q), ("r", r), ("s", s), ("u", u)]
   where
     p = Def [Cls (Fn "p" [Val "a"    ]) Nothing
-            ,Cls (Fn "p" [var "X"]) $ Just $ [Fn "q" [var "X"], Fn "r" [var "X"]]
-            ,Cls (Fn "p" [var "X"]) $ Just $ [Fn "u" [var "X"]]]
-    q = Def [Cls (Fn "q" [var "X"]) $ Just $ [Fn "s" [var "X"]]]
+            ,Cls (Fn "p" [var "X"]) $ Just [Fn "q" [var "X"], Fn "r" [var "X"]]
+            ,Cls (Fn "p" [var "X"]) $ Just [Fn "u" [var "X"]]]
+    q = Def [Cls (Fn "q" [var "X"]) $ Just [Fn "s" [var "X"]]]
     r = Def [Cls (Fn "r" [Val "a"]) Nothing
             ,Cls (Fn "r" [Val "b"]) Nothing]
     s = Def [Cls (Fn "s" [Val "a"]) Nothing
@@ -301,14 +301,14 @@ query31 = Goal [Fn "p" [var "X"]]
 example4 = Program [("list", lst)]
   where
     lst = Def [Cls (Fn "list" [nil]) Nothing
-              ,Cls (Fn "list" [cons (var "H") (var "T")]) $ Just $ [Fn "list" [var "T"]]]
+              ,Cls (Fn "list" [cons (var "H") (var "T")]) $ Just [Fn "list" [var "T"]]]
 
 query4 = Goal [Fn "list" [var "L"]]
 
 example5 = Program [("plist", plst), ("p", p)]
   where
     plst = Def [Cls (Fn "plist" [nil]) Nothing
-                ,Cls (Fn "plist" [cons (var "H") (var "T")]) $ Just $ [Fn "p" [var "H"], Fn "plist" [var "T"]]]
+                ,Cls (Fn "plist" [cons (var "H") (var "T")]) $ Just [Fn "p" [var "H"], Fn "plist" [var "T"]]]
 
     p = Def [Cls (Fn "p" [zero]) Nothing
             ,Cls (Fn "p" [one])  Nothing]
