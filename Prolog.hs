@@ -66,20 +66,9 @@ type Subst = [(Name, Term)]
 
 insert :: Subst -> Name -> Term -> Maybe Subst
 insert s n t
-  | (n, t) `elem` s
-  = Just s
-  | substCheck s n t
-  = Just $ (n, t) : s
-  | otherwise
-  = Nothing
-
-substCheck :: Subst -> Name -> Term -> Bool
-substCheck s n t
-  | Just t' <- lookup n s
-  , t' /= t
-  = False
-  | otherwise
-  = True
+  | (n, t) `elem` s = Just s
+  | maybe True (== t) (lookup n s) = Just $ (n, t) : s
+  | otherwise = Nothing
 
 unionSubst :: Subst -> Subst -> Subst
 unionSubst = foldl (uncurry . ((fromJust .) .) . insert)
