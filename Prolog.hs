@@ -9,7 +9,7 @@ import Data.List (intercalate, find, findIndex, partition)
 import Data.Maybe (fromMaybe, isJust, fromJust, isNothing)
 
 import Control.Arrow (first, second)
-import Control.Monad (foldM)
+import Control.Monad (foldM, ap)
 
 import Debug.Trace
 
@@ -17,7 +17,17 @@ data Name = Name { nmStr :: String, nmIdx :: Int } deriving (Eq, Ord)
 
 var = Var . flip Name 0
 
-data Preterm a = Var a | Val String | Ctr String [Term] deriving (Eq, Functor)
+data Preterm a = Var a | Val String | Ctr String [Preterm a] deriving (Eq, Functor)
+
+instance Applicative Preterm where
+    pure = Var
+    (<*>) = ap
+
+instance Monad Preterm where
+    return = Var
+    (Var a) >>= f = f a
+    (Val s) >>= f = Val s
+    (Ctr n ts) >>= f = Ctr n ((>>= f) <$> ts)
 
 type Term = Preterm Name
 
@@ -123,21 +133,12 @@ unifyList s (x:xs) (y:ys) =
 applySubst :: Subst -> [Term] -> [Term]
 applySubst s ts = [applyTerm s t | t <- ts]
 
-applyTerm _  t@(Val _) = t
-applyTerm [] t@(Var _) = t
-applyTerm ((name, term):ss) t@(Var v)
-  | name == v
-  = applyTerm ss term
-  | otherwise
-  = applyTerm ss t
-applyTerm s (Ctr n ts)
-  = Ctr n (applySubst s ts)
+applyTerm s t = t >>= (\v -> maybe (Var v) (applyTerm s) (v `lookup` s))
 
 applySubstToBody :: Subst -> [Fun] -> [Fun]
 applySubstToBody s fs = applySubstToFun s <$> fs
   where
     applySubstToFun s (Fn name ts) = Fn name $ applySubst s ts
-
 
 getClause :: Int -> Def -> Clause
 getClause i (Def cls) = cls !! i
@@ -168,7 +169,8 @@ freeVarsInGoal (Goal fs) = Set.unions (freeVarsInFn <$> fs)
 freeVarsInFn :: Fun -> Set.Set Name
 freeVarsInFn (Fn _ ts) = Set.unions (freeVars <$> ts)
 
-res prg query = reduceSubst (freeVarsInGoal query) <$> res' prg query
+-- Top level!
+resolve prg query = reduceSubst (freeVarsInGoal query) <$> res' prg query
 
 res' prg query@(Goal q) = resolve' 1 prg 0 [] q
 
