@@ -81,14 +81,13 @@ freeVars (Var x) = Set.singleton x
 freeVars (Ctr _ args) = Set.unions (freeVars <$> args)
 
 unify :: Subst -> Term -> Term -> Maybe Subst
-unify s t1 t2
-  | t1' <- fromMaybe t1 (walk s t1)
-  , t2' <- fromMaybe t2 (walk s t2)
-  = unify' s t1' t2'
+unify s t1 t2 = unify' s (walk s t1) (walk s t2)
 
-walk :: Subst -> Term -> Maybe Term
-walk s (Var n) = lookup n s
-walk s t       = Just t
+walk :: Subst -> Term -> Term
+walk s (Var n)
+  | Just t' <- lookup n s
+  = walk s t'
+walk s t = t
 
 unify' :: Subst -> Term -> Term -> Maybe Subst
 unify' s (Val a) (Val b)
