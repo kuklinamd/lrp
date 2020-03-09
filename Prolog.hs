@@ -20,11 +20,17 @@ data Preterm a = Var a | Val String | Ctr String [Term] deriving (Eq, Functor)
 
 type Term = Preterm Name
 
-data Fun = Fn { fnName :: String, fnArgs :: [Term] }
+data Prefun a = Fn { fnName :: String, fnArgs :: [Preterm a] }
+  deriving (Functor)
+type Fun = Prefun Name
 
-data Clause = Cls { clsHead :: Fun, clsBody :: Maybe [Fun] }
+data Preclause a = Cls { clsHead :: Prefun a, clsBody :: Maybe [Prefun a] }
+  deriving (Functor)
+type Clause = Preclause Name
 
-newtype Def = Def [Clause]
+newtype Predef a = Def [Preclause a]
+  deriving (Functor)
+type Def = Predef Name
 
 newtype Program = Program { defs :: [(String, Def)] }
 
@@ -40,14 +46,17 @@ findDef (Program defs) name
 --
 -- Rename
 --
+rename :: Int -> Name -> Name
+rename i name = name { nmIdx = i }
+
 renameTerm :: Int -> Term -> Term
-renameTerm i = fmap (\name -> name { nmIdx = i })
+renameTerm i = fmap (rename i)
 
 renameFun :: Int -> Fun -> Fun
-renameFun i (Fn name args) = Fn name (renameTerm i <$> args)
+renameFun i = fmap (rename i)
 
 renameClause :: Int -> Clause -> Clause
-renameClause i (Cls head body) = Cls (renameFun i head) (fmap (renameFun i) <$> body)
+renameClause i = fmap (rename i)
 
 --
 -- Unification
@@ -225,14 +234,14 @@ instance Show a => Show (Preterm a) where
   show (Val s) = "`" ++ s
   show (Ctr name args) = name ++ "(" ++ intercalate ", " (show <$> args) ++ ")"
 
-instance Show Fun where
+instance Show a => Show (Prefun a) where
   show (Fn name args) = name ++ "(" ++ intercalate ", " (show <$> args) ++ ")"
 
-instance Show Clause where
+instance Show a => Show (Preclause a) where
   show (Cls head Nothing) = show head ++ "."
   show (Cls head (Just body)) = show head ++ " :- " ++ intercalate ", " (show <$> body) ++ "."
 
-instance Show Def where
+instance Show a => Show (Predef a) where
   show (Def cs) = intercalate "\n" (show <$> cs)
 
 instance Show Program where
