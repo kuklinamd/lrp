@@ -1,52 +1,86 @@
+{-# LANGUAGE DeriveFunctor #-}
 module Unify where
 
+import qualified Data.Set as Set
 import Data.Maybe (fromMaybe)
+import Control.Monad (foldM, ap)
 
 type Name = String
 
-data Term =
-    Var { var :: Name }
-  | Func { name :: Name, args :: [Term] }
-  deriving Show
+data PreTerm a =
+    Var { var :: a}
+  | Func { name :: Name, args :: [PreTerm a] }
+  deriving (Show, Functor, Eq)
+
+instance Applicative PreTerm where
+  pure = Var
+  (<*>) = ap
+
+instance Monad PreTerm where
+  return = pure
+  (Var a) >>= f = f a
+  (Func n ts) >>= f = Func n ((>>= f) <$> ts)
+
+type Term = PreTerm String
 
 type Subst = [(Name, Term)]
 
+insert :: Subst -> String -> Term -> Maybe Subst
+insert s n t
+  | t' == Just t = Just s
+  | Nothing <- t' = Just $ (n, t) : s
+  | otherwise = Nothing
+  where t' = lookup n s
+
+unionSubst :: Subst -> Subst -> Maybe Subst
+unionSubst = foldM (uncurry . insert)
+
+freeVars :: Term -> Set.Set String
+freeVars (Var x) = Set.singleton x
+freeVars (Func _ args) = Set.unions (freeVars <$> args)
+
 unify :: Subst -> Term -> Term -> Maybe Subst
-unify s t1 t2
-  | t1' <- fromMaybe t1 (walk s t1)
-  , t2' <- fromMaybe t2 (walk s t2)
-  = unify' s t1' t2'
+unify s t1 t2 = unify' s (walk s t1) (walk s t2)
   where
+    walk :: Subst -> Term -> Term
+    walk s (Var n)
+     | Just t' <- lookup n s
+     = walk s t'
+    walk _ t = t
+
     unify' :: Subst -> Term -> Term -> Maybe Subst
-    unify' s (Var n1) t2@(Var n2)
-      | n1 == n2
+    unify' s (Var a) (Var b)
+      | a == b
       = Just s
-      | otherwise
-      = Just $ unite [(n1, t2)] s
+    unify' s (Var a) t
+      | a `notElem` freeVars t
+      = insert s a t
+    unify' s t (Var a)
+      | a `notElem` freeVars t
+      = insert s a t
     unify' s (Func n1 a1) (Func n2 a2)
       | n1 == n2
       , length a1 == length a2
-      = foldl1 unite <$> (sequence $ uncurry (unify s) <$> zip a1 a2)
-    unify' s t1@(Var n1) t2
-      | not $ n1 `elem` freeVars t2
-      = Just $ unite [(n1, t2)] s
-    unify' s t1 t2@(Var n2)
-      | not $ n2 `elem` freeVars t1
-      = Just $ unite [(n2, t2)] s
+      = unifyList s a1 a2
     unify' _ _ _
       = Nothing
 
-    unite :: Subst -> Subst -> Subst
-    unite = (++)
+    unifyList s [] [] = Just s
+    unifyList _ [] _  = Nothing
+    unifyList _ _ [] = Nothing
+    unifyList s (x:xs) (y:ys) =
+      do
+        s'  <- unify s x y
+        let xs' = applySubstToTerms s' xs
+        let ys' = applySubstToTerms s' ys
+        s'' <- unifyList s xs' ys'
+        unionSubst s' s''
 
-    freeVars :: Term -> [Name]
-    freeVars (Var n) = [n]
-    freeVars (Func _ args) = concat (freeVars <$> args)
+    applySubstToTerms :: Subst -> [Term] -> [Term]
+    applySubstToTerms s ts = [applySubstToTerm s t | t <- ts]
 
-    walk :: Subst -> Term -> Maybe Term
-    walk s (Var n) = lookup n s
-    walk s t = Just t
-
+    applySubstToTerm :: Subst -> Term -> Term
+    applySubstToTerm s t = t >>= (\v -> maybe (Var v) (applySubstToTerm s) (v `lookup` s))
 
 test msg t1 t2 = do
   putStrLn $ ">>>" ++ msg
@@ -57,7 +91,7 @@ test1 = test "Ok: x == y" (Var "x") (Var "y")
 test2 = test "Ok: x == x" (Var "x") (Var "x")
 test3 = test "Ok: x == f()" (Var "x") (Func "f" [])
 test4 = test "Fail: g(x) == x" (Func "g" [Var "x"]) (Var "x")
-test5 = test "Fail: f(x) = g(y)" (Func "f" [Var "x"]) (Func "g" [Var "y"])
-test6 = test "Ok: f(x) = f(y)" (Func "f" [Var "x"]) (Func "f" [Var "y"])
+test5 = test "Fail: f(x) == g(y)" (Func "f" [Var "x"]) (Func "g" [Var "y"])
+test6 = test "Ok: f(x) == f(y)" (Func "f" [Var "x"]) (Func "f" [Var "y"])
 
 runTests = do {test1; test2; test3; test4; test5; test6}
