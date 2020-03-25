@@ -180,15 +180,12 @@ renameDef nameSupply (Def def) =
 
 resolve' _ _ _ subst [] = [subst]
 resolve' nameSupply prg idx subst q@(g@(Fn name _):gs) =
- -- trace ("\nResolve " ++ show q ++ " in " ++ show subst) $
  let
     ~(Def def) = renameDef nameSupply $ findDef prg name
     -- Next level of evaluation tree
     children = unifyWithClause subst g <$> def
     -- Left only unificated children
- -- in trace ("\nUnified: " ++ show children) $ let
     branches = fromJust <$> filter isJust children
-
     ns' = nextName nameSupply
  in branches >>= (\(s, g) -> resolve' ns' prg idx s (g ++ gs))
 
