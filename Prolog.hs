@@ -255,6 +255,8 @@ query12 = Goal [Fn "siblings" [Val "Child1", Val "Child3"]]
 query13 = Goal [Fn "siblings" [Val "Child1", var "X"]]
 query14 = Goal [Fn "siblings" [var "Y", var "X"]]
 
+runExample1 = run example1 query11
+
 cons x xs = Ctr "cons" [x, xs]
 nil = Ctr "nil" []
 
